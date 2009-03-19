@@ -789,19 +789,48 @@ class browse_links {
 		$this->thisScript = t3lib_div::getIndpEnv('SCRIPT_NAME');
 
 			// CurrentUrl - the current link url must be passed around if it exists
-		if ($this->mode=='wizard')	{
-			$currentLinkParts = t3lib_div::trimExplode(' ',$this->P['currentValue']);
-			$this->curUrlArray = array(
-				'target' => $currentLinkParts[1]
-			);
-			$this->curUrlInfo=$this->parseCurUrl($this->siteURL.'?id='.$currentLinkParts[0],$this->siteURL);
-		} else {
-			$this->curUrlArray = t3lib_div::_GP('curUrl');
-			if ($this->curUrlArray['all'])	{
-				$this->curUrlArray=t3lib_div::get_tag_attributes($this->curUrlArray['all']);
+			if ($this->mode == 'wizard')	{
+				$currentLinkParts = t3lib_div::trimExplode(' ',$this->P['currentValue']);
+				$initialCurUrlArray = array (
+					'href'   => $currentLinkParts[0],
+					'target' => $currentLinkParts[1],
+					'class'  => $currentLinkParts[2],
+					'title'  => $currentLinkParts[3],
+				);
+				$this->curUrlArray = (is_array(t3lib_div::_GP('curUrl'))) ? 
+					array_merge($initialCurUrlArray, t3lib_div::_GP('curUrl')) : 
+					$initialCurUrlArray;
+				$this->curUrlInfo = $this->parseCurUrl($this->siteURL.'?id='.$this->curUrlArray['href'], $this->siteURL);
+				if ($this->curUrlInfo['pageid'] == 0 && $this->curUrlArray['href']) { // pageid == 0 means that this is not an internal (page) link
+					if (@file_exists(PATH_site.rawurldecode($this->curUrlArray['href'])))	{ // check if this is a link to a file
+						if (t3lib_div::isFirstPartOfStr($this->curUrlArray['href'], PATH_site)) {
+							$currentLinkParts[0] = substr($this->curUrlArray['href'], strlen(PATH_site));
+						}
+						$this->curUrlInfo = $this->parseCurUrl($this->siteURL.$this->curUrlArray['href'], $this->siteURL);
+					} elseif (strstr($this->curUrlArray['href'], '@')) { // check for email link
+						if (t3lib_div::isFirstPartOfStr($this->curUrlArray['href'], 'mailto:')) {
+							$currentLinkParts[0] = substr($this->curUrlArray['href'], 7);
+						}
+						$this->curUrlInfo = $this->parseCurUrl('mailto:'.$this->curUrlArray['href'], $this->siteURL);
+					} else { // nothing of the above. this is an external link
+						if(strpos($this->curUrlArray['href'], '://') === false) {
+							$currentLinkParts[0] = 'http://' . $this->curUrlArray['href'];
+						}
+						$this->curUrlInfo = $this->parseCurUrl($currentLinkParts[0], $this->siteURL);
+					}
+				} elseif (!$this->curUrlArray['href']) {
+					$this->curUrlInfo = array();
+					$this->act = 'page';
+				} else {
+					$this->curUrlInfo = $this->parseCurUrl($this->siteURL.'?id='.$this->curUrlArray['href'], $this->siteURL);
+				} 
+			} else {
+				$this->curUrlArray = t3lib_div::_GP('curUrl');
+				if ($this->curUrlArray['all'])	{
+					$this->curUrlArray=t3lib_div::get_tag_attributes($this->curUrlArray['all']);
+				}
+				$this->curUrlInfo=$this->parseCurUrl($this->curUrlArray['href'],$this->siteURL);
 			}
-			$this->curUrlInfo=$this->parseCurUrl($this->curUrlArray['href'],$this->siteURL);
-		}
 
 			// Determine nature of current url:
 		$this->act=t3lib_div::_GP('act');
